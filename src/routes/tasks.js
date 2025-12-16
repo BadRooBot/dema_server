@@ -48,6 +48,11 @@ router.get('/', async (req, res) => {
       description: row.description,
       plannedMinutes: row.planned_minutes,
       date: row.date,
+      scheduledTime: row.scheduled_time,
+      imagePath: row.image_path,
+      notes: row.notes,
+      actualMinutes: row.actual_minutes || 0,
+      partialMinutes: row.partial_minutes || 0,
       isCompleted: row.is_completed,
       totalLoggedMinutes: parseInt(row.total_logged_minutes) || 0,
       createdAt: row.created_at,
@@ -91,6 +96,11 @@ router.get('/:id', async (req, res) => {
       description: row.description,
       plannedMinutes: row.planned_minutes,
       date: row.date,
+      scheduledTime: row.scheduled_time,
+      imagePath: row.image_path,
+      notes: row.notes,
+      actualMinutes: row.actual_minutes || 0,
+      partialMinutes: row.partial_minutes || 0,
       isCompleted: row.is_completed,
       totalLoggedMinutes: parseInt(row.total_logged_minutes) || 0,
       createdAt: row.created_at,
@@ -107,7 +117,7 @@ router.get('/:id', async (req, res) => {
  */
 router.post('/', async (req, res) => {
   try {
-    const { title, description, plannedMinutes, date, planId } = req.body;
+    const { title, description, plannedMinutes, date, planId, scheduledTime, imagePath, notes, actualMinutes, partialMinutes } = req.body;
     
     // Validation
     if (!title || title.trim() === '') {
@@ -146,10 +156,10 @@ router.post('/', async (req, res) => {
     }
     
     const result = await query(
-      `INSERT INTO tasks (user_id, plan_id, title, description, planned_minutes, date) 
-       VALUES ($1, $2, $3, $4, $5, $6) 
+      `INSERT INTO tasks (user_id, plan_id, title, description, planned_minutes, date, scheduled_time, image_path, notes, actual_minutes, partial_minutes) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) 
        RETURNING *`,
-      [req.user.id, planId || null, title.trim(), description || null, plannedMinutes || 0, date]
+      [req.user.id, planId || null, title.trim(), description || null, plannedMinutes || 0, date, scheduledTime || null, imagePath || null, notes || null, actualMinutes || 0, partialMinutes || 0]
     );
     
     const row = result.rows[0];
@@ -160,6 +170,11 @@ router.post('/', async (req, res) => {
       description: row.description,
       plannedMinutes: row.planned_minutes,
       date: row.date,
+      scheduledTime: row.scheduled_time,
+      imagePath: row.image_path,
+      notes: row.notes,
+      actualMinutes: row.actual_minutes,
+      partialMinutes: row.partial_minutes,
       isCompleted: row.is_completed,
       createdAt: row.created_at,
       updatedAt: row.updated_at
@@ -176,7 +191,7 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, description, plannedMinutes, date, planId, isCompleted } = req.body;
+    const { title, description, plannedMinutes, date, planId, isCompleted, scheduledTime, imagePath, notes, actualMinutes, partialMinutes } = req.body;
     
     // Check if task exists and belongs to user
     const existingTask = await query(
@@ -225,10 +240,15 @@ router.put('/:id', async (req, res) => {
            date = COALESCE($4, date),
            plan_id = COALESCE($5, plan_id),
            is_completed = COALESCE($6, is_completed),
+           scheduled_time = COALESCE($7, scheduled_time),
+           image_path = COALESCE($8, image_path),
+           notes = COALESCE($9, notes),
+           actual_minutes = COALESCE($10, actual_minutes),
+           partial_minutes = COALESCE($11, partial_minutes),
            updated_at = NOW()
-       WHERE id = $7 AND user_id = $8
+       WHERE id = $12 AND user_id = $13
        RETURNING *`,
-      [title?.trim(), description, plannedMinutes, date, planId, isCompleted, id, req.user.id]
+      [title?.trim(), description, plannedMinutes, date, planId, isCompleted, scheduledTime, imagePath, notes, actualMinutes, partialMinutes, id, req.user.id]
     );
     
     const row = result.rows[0];
@@ -239,6 +259,11 @@ router.put('/:id', async (req, res) => {
       description: row.description,
       plannedMinutes: row.planned_minutes,
       date: row.date,
+      scheduledTime: row.scheduled_time,
+      imagePath: row.image_path,
+      notes: row.notes,
+      actualMinutes: row.actual_minutes,
+      partialMinutes: row.partial_minutes,
       isCompleted: row.is_completed,
       createdAt: row.created_at,
       updatedAt: row.updated_at

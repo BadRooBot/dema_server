@@ -20,6 +20,11 @@ CREATE TABLE IF NOT EXISTS plans (
   title VARCHAR(255) NOT NULL,
   description TEXT,
   target_hours INTEGER NOT NULL DEFAULT 0,
+  start_date DATE,
+  end_date DATE,
+  background_image_path TEXT,
+  notes TEXT,
+  priority VARCHAR(20) NOT NULL DEFAULT 'medium' CHECK (priority IN ('high', 'medium', 'low')),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -33,6 +38,11 @@ CREATE TABLE IF NOT EXISTS tasks (
   description TEXT,
   planned_minutes INTEGER NOT NULL DEFAULT 0,
   date DATE NOT NULL,
+  scheduled_time TIMESTAMP WITH TIME ZONE,
+  image_path TEXT,
+  notes TEXT,
+  actual_minutes INTEGER NOT NULL DEFAULT 0,
+  partial_minutes INTEGER NOT NULL DEFAULT 0,
   is_completed BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()

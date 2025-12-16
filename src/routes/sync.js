@@ -39,9 +39,10 @@ router.post('/push', async (req, res) => {
         if (existing.rows.length === 0) {
           // Insert new plan
           await client.query(
-            `INSERT INTO plans (id, user_id, title, description, target_hours, created_at, updated_at)
-             VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-            [plan.id, userId, plan.title, plan.description, plan.targetHours, 
+            `INSERT INTO plans (id, user_id, title, description, target_hours, start_date, end_date, background_image_path, notes, priority, created_at, updated_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+            [plan.id, userId, plan.title, plan.description, plan.targetHours,
+             plan.startDate, plan.endDate, plan.backgroundImagePath, plan.notes, plan.priority || 'medium',
              plan.createdAt, plan.updatedAt]
           );
           results.plans.created++;
@@ -52,9 +53,9 @@ router.post('/push', async (req, res) => {
           
           if (clientUpdatedAt > serverUpdatedAt) {
             await client.query(
-              `UPDATE plans SET title = $1, description = $2, target_hours = $3, updated_at = $4
-               WHERE id = $5 AND user_id = $6`,
-              [plan.title, plan.description, plan.targetHours, plan.updatedAt, plan.id, userId]
+              `UPDATE plans SET title = $1, description = $2, target_hours = $3, start_date = $4, end_date = $5, background_image_path = $6, notes = $7, priority = $8, updated_at = $9
+               WHERE id = $10 AND user_id = $11`,
+              [plan.title, plan.description, plan.targetHours, plan.startDate, plan.endDate, plan.backgroundImagePath, plan.notes, plan.priority || 'medium', plan.updatedAt, plan.id, userId]
             );
             results.plans.updated++;
           }
@@ -86,10 +87,11 @@ router.post('/push', async (req, res) => {
         if (existing.rows.length === 0) {
           // Insert new task
           await client.query(
-            `INSERT INTO tasks (id, user_id, plan_id, title, description, planned_minutes, date, is_completed, created_at, updated_at)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+            `INSERT INTO tasks (id, user_id, plan_id, title, description, planned_minutes, date, scheduled_time, image_path, notes, actual_minutes, partial_minutes, is_completed, created_at, updated_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
             [task.id, userId, task.planId, task.title, task.description, 
-             task.plannedMinutes, task.date, task.isCompleted, task.createdAt, task.updatedAt]
+             task.plannedMinutes, task.date, task.scheduledTime, task.imagePath, task.notes,
+             task.actualMinutes || 0, task.partialMinutes || 0, task.isCompleted, task.createdAt, task.updatedAt]
           );
           results.tasks.created++;
         } else {
@@ -100,10 +102,10 @@ router.post('/push', async (req, res) => {
           if (clientUpdatedAt > serverUpdatedAt) {
             await client.query(
               `UPDATE tasks SET plan_id = $1, title = $2, description = $3, planned_minutes = $4, 
-               date = $5, is_completed = $6, updated_at = $7
-               WHERE id = $8 AND user_id = $9`,
+               date = $5, scheduled_time = $6, image_path = $7, notes = $8, actual_minutes = $9, partial_minutes = $10, is_completed = $11, updated_at = $12
+               WHERE id = $13 AND user_id = $14`,
               [task.planId, task.title, task.description, task.plannedMinutes,
-               task.date, task.isCompleted, task.updatedAt, task.id, userId]
+               task.date, task.scheduledTime, task.imagePath, task.notes, task.actualMinutes || 0, task.partialMinutes || 0, task.isCompleted, task.updatedAt, task.id, userId]
             );
             results.tasks.updated++;
           }
@@ -226,6 +228,11 @@ router.get('/pull', async (req, res) => {
       title: row.title,
       description: row.description,
       targetHours: row.target_hours,
+      startDate: row.start_date,
+      endDate: row.end_date,
+      backgroundImagePath: row.background_image_path,
+      notes: row.notes,
+      priority: row.priority || 'medium',
       createdAt: row.created_at,
       updatedAt: row.updated_at
     }));
@@ -237,6 +244,11 @@ router.get('/pull', async (req, res) => {
       description: row.description,
       plannedMinutes: row.planned_minutes,
       date: row.date,
+      scheduledTime: row.scheduled_time,
+      imagePath: row.image_path,
+      notes: row.notes,
+      actualMinutes: row.actual_minutes || 0,
+      partialMinutes: row.partial_minutes || 0,
       isCompleted: row.is_completed,
       createdAt: row.created_at,
       updatedAt: row.updated_at

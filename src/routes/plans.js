@@ -29,6 +29,11 @@ router.get('/', async (req, res) => {
       title: row.title,
       description: row.description,
       targetHours: row.target_hours,
+      startDate: row.start_date,
+      endDate: row.end_date,
+      backgroundImagePath: row.background_image_path,
+      notes: row.notes,
+      priority: row.priority || 'medium',
       totalLoggedMinutes: parseInt(row.total_logged_minutes) || 0,
       createdAt: row.created_at,
       updatedAt: row.updated_at
@@ -70,6 +75,11 @@ router.get('/:id', async (req, res) => {
       title: row.title,
       description: row.description,
       targetHours: row.target_hours,
+      startDate: row.start_date,
+      endDate: row.end_date,
+      backgroundImagePath: row.background_image_path,
+      notes: row.notes,
+      priority: row.priority || 'medium',
       totalLoggedMinutes: parseInt(row.total_logged_minutes) || 0,
       createdAt: row.created_at,
       updatedAt: row.updated_at
@@ -85,7 +95,7 @@ router.get('/:id', async (req, res) => {
  */
 router.post('/', async (req, res) => {
   try {
-    const { title, description, targetHours } = req.body;
+    const { title, description, targetHours, startDate, endDate, backgroundImagePath, notes, priority } = req.body;
     
     // Validation
     if (!title || title.trim() === '') {
@@ -101,12 +111,19 @@ router.post('/', async (req, res) => {
         details: ['Target hours must be a non-negative number'] 
       });
     }
+
+    if (priority !== undefined && !['high', 'medium', 'low'].includes(priority)) {
+      return res.status(400).json({ 
+        error: 'Validation failed', 
+        details: ['Priority must be high, medium, or low'] 
+      });
+    }
     
     const result = await query(
-      `INSERT INTO plans (user_id, title, description, target_hours) 
-       VALUES ($1, $2, $3, $4) 
+      `INSERT INTO plans (user_id, title, description, target_hours, start_date, end_date, background_image_path, notes, priority) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) 
        RETURNING *`,
-      [req.user.id, title.trim(), description || null, targetHours || 0]
+      [req.user.id, title.trim(), description || null, targetHours || 0, startDate || null, endDate || null, backgroundImagePath || null, notes || null, priority || 'medium']
     );
     
     const row = result.rows[0];
@@ -115,6 +132,11 @@ router.post('/', async (req, res) => {
       title: row.title,
       description: row.description,
       targetHours: row.target_hours,
+      startDate: row.start_date,
+      endDate: row.end_date,
+      backgroundImagePath: row.background_image_path,
+      notes: row.notes,
+      priority: row.priority,
       createdAt: row.created_at,
       updatedAt: row.updated_at
     });
@@ -130,7 +152,7 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { title, description, targetHours } = req.body;
+    const { title, description, targetHours, startDate, endDate, backgroundImagePath, notes, priority } = req.body;
     
     // Check if plan exists and belongs to user
     const existingPlan = await query(
@@ -156,16 +178,28 @@ router.put('/:id', async (req, res) => {
         details: ['Target hours must be a non-negative number'] 
       });
     }
+
+    if (priority !== undefined && !['high', 'medium', 'low'].includes(priority)) {
+      return res.status(400).json({ 
+        error: 'Validation failed', 
+        details: ['Priority must be high, medium, or low'] 
+      });
+    }
     
     const result = await query(
       `UPDATE plans 
        SET title = COALESCE($1, title),
            description = COALESCE($2, description),
            target_hours = COALESCE($3, target_hours),
+           start_date = COALESCE($4, start_date),
+           end_date = COALESCE($5, end_date),
+           background_image_path = COALESCE($6, background_image_path),
+           notes = COALESCE($7, notes),
+           priority = COALESCE($8, priority),
            updated_at = NOW()
-       WHERE id = $4 AND user_id = $5
+       WHERE id = $9 AND user_id = $10
        RETURNING *`,
-      [title?.trim(), description, targetHours, id, req.user.id]
+      [title?.trim(), description, targetHours, startDate, endDate, backgroundImagePath, notes, priority, id, req.user.id]
     );
     
     const row = result.rows[0];
@@ -174,6 +208,11 @@ router.put('/:id', async (req, res) => {
       title: row.title,
       description: row.description,
       targetHours: row.target_hours,
+      startDate: row.start_date,
+      endDate: row.end_date,
+      backgroundImagePath: row.background_image_path,
+      notes: row.notes,
+      priority: row.priority,
       createdAt: row.created_at,
       updatedAt: row.updated_at
     });
