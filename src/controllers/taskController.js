@@ -1,8 +1,12 @@
 const TaskModel = require('../models/taskModel');
 const PlanModel = require('../models/planModel');
 
+// Create a task (single or recurring - stored as ONE row)
 const createTask = async (req, res) => {
-    const { plan_id, title, description, duration_minutes, start_time, is_recurring, repeat_days, priority } = req.body;
+    const {
+        plan_id, title, description, duration_minutes, task_date,
+        start_time, is_recurring, recurrence_pattern, repeat_days, priority
+    } = req.body;
     const user_id = req.user.id;
 
     try {
@@ -11,48 +15,32 @@ const createTask = async (req, res) => {
         if (!plan) return res.status(404).json({ message: 'Plan not found' });
         if (plan.user_id !== user_id) return res.status(403).json({ message: 'Not authorized' });
 
-        // Logic for Recurring Tasks
-        if (is_recurring && repeat_days) {
-            const startDate = new Date(plan.start_date);
-            const endDate = new Date(plan.end_date);
-            const tasksToCreate = [];
-            const days = ['0', '1', '2', '3', '4', '5', '6'];
-
-            for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
-                const dayIndex = d.getDay();
-                if (repeat_days[dayIndex] === '1') {
-                    tasksToCreate.push({
-                        plan_id,
-                        title,
-                        description,
-                        duration_minutes,
-                        task_date: d.toISOString().split('T')[0], // YYYY-MM-DD
-                        start_time,
-                        is_recurring: true,
-                        recurrence_pattern: 'daily_selected',
-                        repeat_days,
-                        priority: priority || 2
-                    });
-                }
-            }
-            const createdTasks = await TaskModel.createMany(tasksToCreate);
-            res.status(201).json({ message: `Created \${createdTasks.length} recurring tasks`, tasks: createdTasks });
-        } else {
-            const { task_date } = req.body;
-            if (!task_date) return res.status(400).json({ message: 'task_date is required for single task' });
-
-            const task = await TaskModel.create({
-                plan_id, title, description, duration_minutes, task_date, start_time,
-                is_recurring: false, priority: priority || 2
-            });
-            res.status(201).json(task);
+        // Validate: non-recurring needs task_date
+        if (!is_recurring && !task_date) {
+            return res.status(400).json({ message: 'task_date is required for non-recurring task' });
         }
+
+        const task = await TaskModel.create({
+            plan_id,
+            title,
+            description,
+            duration_minutes: duration_minutes || 30,
+            task_date: is_recurring ? null : task_date,
+            start_time,
+            is_recurring: is_recurring || false,
+            recurrence_pattern: is_recurring ? (recurrence_pattern || 'custom') : null,
+            repeat_days: is_recurring ? repeat_days : null,
+            priority: priority || 2
+        });
+
+        res.status(201).json(task);
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Server error', error: error.message });
     }
 };
 
+// Get tasks - by date or by plan_id
 const getTasks = async (req, res) => {
     const { date, plan_id } = req.query;
 
@@ -69,17 +57,28 @@ const getTasks = async (req, res) => {
 
         if (date) {
             const tasks = await TaskModel.findByDate(req.user.id, date);
-            return res.json(tasks);
+
+            // Map the results to include instance status for recurring tasks
+            const mappedTasks = tasks.map(t => ({
+                ...t,
+                status: t.instance_status || t.status,
+                actual_duration_minutes: t.instance_actual_duration || t.actual_duration_minutes || 0
+            }));
+
+            return res.json(mappedTasks);
         }
 
-        return res.status(400).json({ message: 'query param date or plan_id required' });
+        return res.status(400).json({ message: 'Query param date or plan_id required' });
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Server error' });
     }
 };
 
+// Update a task or a specific instance
 const updateTask = async (req, res) => {
+    const { instance_date } = req.query; // For updating a specific day of a recurring task
+
     try {
         const task = await TaskModel.findById(req.params.id);
         if (!task) return res.status(404).json({ message: 'Task not found' });
@@ -88,6 +87,18 @@ const updateTask = async (req, res) => {
         const plan = await PlanModel.findById(task.plan_id);
         if (plan.user_id !== req.user.id) return res.status(403).json({ message: 'Not authorized' });
 
+        // If recurring task and instance_date provided, update the instance
+        if (task.is_recurring && instance_date) {
+            const instance = await TaskModel.updateInstance(task.id, instance_date, req.body);
+            return res.json({
+                ...task,
+                status: instance.status,
+                actual_duration_minutes: instance.actual_duration_minutes,
+                instance
+            });
+        }
+
+        // Otherwise update the base task
         const updatedTask = await TaskModel.update(req.params.id, req.body);
         res.json(updatedTask);
     } catch (error) {

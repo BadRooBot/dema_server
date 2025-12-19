@@ -1,19 +1,20 @@
 const db = require('../db');
 
 class PlanModel {
-    static async create({ user_id, name, description, plan_type, start_date, end_date, image_path }) {
+    static async create({ user_id, name, description, plan_type, start_date, end_date, image_path, priority, color }) {
         const text = `
-      INSERT INTO plans (user_id, name, description, plan_type, start_date, end_date, image_path, status)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, 'not_started')
+      INSERT INTO plans (user_id, name, description, plan_type, start_date, end_date, image_path, status, priority, color)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, 'not_started', $8, $9)
       RETURNING *
     `;
-        const values = [user_id, name, description, plan_type, start_date, end_date, image_path];
+        const values = [user_id, name, description, plan_type || 'other', start_date, end_date, image_path, priority || 2, color || '#4CAF50'];
         const { rows } = await db.query(text, values);
         return rows[0];
     }
 
     static async findAllByUserId(user_id) {
-        const text = 'SELECT * FROM plans WHERE user_id = $1 ORDER BY created_at DESC';
+        // Order by priority (1 = highest) then by display_order, then by created_at
+        const text = 'SELECT * FROM plans WHERE user_id = $1 ORDER BY priority ASC, display_order ASC, created_at DESC';
         const { rows } = await db.query(text, [user_id]);
         return rows;
     }
@@ -25,19 +26,26 @@ class PlanModel {
     }
 
     static async update(id, updates) {
-        /* 
-           Dynamic update query builder.
-           Note: In a real app, strict validation is needed.
-        */
-        const keys = Object.keys(updates);
-        const values = Object.values(updates);
+        const allowedFields = ['name', 'description', 'plan_type', 'start_date', 'end_date',
+            'image_path', 'status', 'priority', 'display_order', 'color',
+            'daily_goal_minutes', 'reminders_enabled'];
+        const fields = [];
+        const values = [];
+        let paramCount = 1;
 
-        if (keys.length === 0) return null;
+        for (const [key, value] of Object.entries(updates)) {
+            if (allowedFields.includes(key) && value !== undefined) {
+                fields.push(`${key} = $${paramCount}`);
+                values.push(value);
+                paramCount++;
+            }
+        }
 
-        const setClause = keys.map((key, index) => `${key} = $${index + 1}`).join(', ');
-        const text = `UPDATE plans SET ${setClause} WHERE id = $${keys.length + 1} RETURNING *`;
+        if (fields.length === 0) return null;
 
-        const { rows } = await db.query(text, [...values, id]);
+        values.push(id);
+        const text = `UPDATE plans SET ${fields.join(', ')} WHERE id = $${paramCount} RETURNING *`;
+        const { rows } = await db.query(text, values);
         return rows[0];
     }
 
@@ -45,6 +53,15 @@ class PlanModel {
         const text = 'DELETE FROM plans WHERE id = $1 RETURNING id';
         const { rows } = await db.query(text, [id]);
         return rows[0];
+    }
+
+    // Update display order for multiple plans
+    static async updateOrder(plan_orders) {
+        // plan_orders = [{ id: 1, display_order: 0 }, { id: 2, display_order: 1 }, ...]
+        for (const { id, display_order } of plan_orders) {
+            await db.query('UPDATE plans SET display_order = $1 WHERE id = $2', [display_order, id]);
+        }
+        return true;
     }
 }
 

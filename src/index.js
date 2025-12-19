@@ -19,6 +19,7 @@ app.use('/api/plans', planRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/notes', require('./routes/notesRoutes'));
 app.use('/api/stats', require('./routes/statsRoutes'));
+app.use('/api/habits', require('./routes/habitsRoutes'));
 
 // Health Check
 app.get('/', (req, res) => {
