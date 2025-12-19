@@ -1,7 +1,10 @@
-require('dotenv').config();
-
 const express = require('express');
 const cors = require('cors');
+require('dotenv').config();
+
+const authRoutes = require('./routes/authRoutes');
+const planRoutes = require('./routes/planRoutes');
+const taskRoutes = require('./routes/taskRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -10,29 +13,24 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+// Routes
+app.use('/api/auth', authRoutes);
+app.use('/api/plans', planRoutes);
+app.use('/api/tasks', taskRoutes);
+app.use('/api/notes', require('./routes/notesRoutes'));
+app.use('/api/stats', require('./routes/statsRoutes'));
+
+// Health Check
+app.get('/', (req, res) => {
+    res.send('Plans Management API is running...');
 });
 
-// API routes
-app.use('/api/auth', require('./routes/auth'));
-app.use('/api/plans', require('./routes/plans'));
-app.use('/api/tasks', require('./routes/tasks'));
-app.use('/api/sessions', require('./routes/sessions'));
-app.use('/api/sync', require('./routes/sync'));
-
-// Error handling middleware
+// Global Error Handler
 app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ error: 'Internal server error' });
+    console.error(err.stack);
+    res.status(500).json({ message: 'Something went wrong!', error: err.message });
 });
 
-// Start server
-if (require.main === module) {
-  app.listen(PORT, () => {
+app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
-  });
-}
-
-module.exports = app;
+});
