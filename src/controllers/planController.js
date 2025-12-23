@@ -1,7 +1,20 @@
 const PlanModel = require('../models/planModel');
 
 const createPlan = async (req, res) => {
-    const { name, description, plan_type, start_date, end_date, image_path } = req.body;
+    const { 
+        name, 
+        description, 
+        plan_type, 
+        start_date, 
+        end_date, 
+        image_path,
+        color,
+        priority,
+        status,
+        daily_goal_minutes,
+        reminders_enabled,
+        display_order
+    } = req.body;
     const user_id = req.user.id;
 
     try {
@@ -13,6 +26,12 @@ const createPlan = async (req, res) => {
             start_date,
             end_date,
             image_path,
+            color,
+            priority,
+            status,
+            daily_goal_minutes,
+            reminders_enabled,
+            display_order
         });
         res.status(201).json(plan);
     } catch (error) {

@@ -1,19 +1,32 @@
 const db = require('../db');
 
 class PlanModel {
-    static async create({ user_id, name, description, plan_type, start_date, end_date, image_path, priority, color }) {
+    static async create({ user_id, name, description, plan_type, start_date, end_date, image_path, priority, color, status, daily_goal_minutes, reminders_enabled, display_order }) {
         const text = `
-      INSERT INTO plans (user_id, name, description, plan_type, start_date, end_date, image_path, status, priority, color)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, 'not_started', $8, $9)
+      INSERT INTO plans (user_id, name, description, plan_type, start_date, end_date, image_path, status, priority, color, daily_goal_minutes, reminders_enabled, display_order)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
       RETURNING *
     `;
-        const values = [user_id, name, description, plan_type || 'other', start_date, end_date, image_path, priority || 2, color || '#4CAF50'];
+        const values = [
+            user_id, 
+            name, 
+            description, 
+            plan_type || 'other', 
+            start_date, 
+            end_date, 
+            image_path, 
+            status || 'not_started', 
+            priority || 2, 
+            color || '#4CAF50',
+            daily_goal_minutes || 0,
+            reminders_enabled !== undefined ? reminders_enabled : 1,
+            display_order || 0
+        ];
         const { rows } = await db.query(text, values);
         return rows[0];
     }
 
     static async findAllByUserId(user_id) {
-        // Order by priority (1 = highest) then by display_order, then by created_at
         const text = 'SELECT * FROM plans WHERE user_id = $1 ORDER BY priority ASC, display_order ASC, created_at DESC';
         const { rows } = await db.query(text, [user_id]);
         return rows;
@@ -55,9 +68,7 @@ class PlanModel {
         return rows[0];
     }
 
-    // Update display order for multiple plans
     static async updateOrder(plan_orders) {
-        // plan_orders = [{ id: 1, display_order: 0 }, { id: 2, display_order: 1 }, ...]
         for (const { id, display_order } of plan_orders) {
             await db.query('UPDATE plans SET display_order = $1 WHERE id = $2', [display_order, id]);
         }
