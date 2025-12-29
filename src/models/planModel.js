@@ -26,6 +26,12 @@ class PlanModel {
         return rows[0];
     }
 
+    static async findDuplicate(user_id, name, start_date, end_date) {
+        const text = 'SELECT * FROM plans WHERE user_id = $1 AND name = $2 AND start_date = $3 AND end_date = $4';
+        const { rows } = await db.query(text, [user_id, name, start_date, end_date]);
+        return rows[0];
+    }
+
     static async findAllByUserId(user_id) {
         const text = 'SELECT * FROM plans WHERE user_id = $1 ORDER BY priority ASC, display_order ASC, created_at DESC';
         const { rows } = await db.query(text, [user_id]);

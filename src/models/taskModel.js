@@ -19,6 +19,21 @@ const TaskModel = {
         return rows[0];
     },
 
+    findDuplicate: async (plan_id, title, task_date, is_recurring) => {
+        let query = 'SELECT * FROM tasks WHERE plan_id = $1 AND title = $2';
+        let params = [plan_id, title];
+
+        if (is_recurring) {
+            query += ' AND is_recurring = 1';
+        } else {
+            query += ' AND is_recurring = 0 AND task_date = $3';
+            params.push(task_date);
+        }
+
+        const { rows } = await db.query(query, params);
+        return rows[0];
+    },
+
     findById: async (id) => {
         const { rows } = await db.query('SELECT * FROM tasks WHERE id = $1', [id]);
         return rows[0];

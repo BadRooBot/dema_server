@@ -1,12 +1,12 @@
 const PlanModel = require('../models/planModel');
 
 const createPlan = async (req, res) => {
-    const { 
-        name, 
-        description, 
-        plan_type, 
-        start_date, 
-        end_date, 
+    const {
+        name,
+        description,
+        plan_type,
+        start_date,
+        end_date,
         image_path,
         color,
         priority,
@@ -18,6 +18,12 @@ const createPlan = async (req, res) => {
     const user_id = req.user.id;
 
     try {
+        // Check for duplicate
+        const existingPlan = await PlanModel.findDuplicate(user_id, name, start_date, end_date);
+        if (existingPlan) {
+            return res.status(200).json(existingPlan);
+        }
+
         const plan = await PlanModel.create({
             user_id,
             name,

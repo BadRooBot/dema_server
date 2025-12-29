@@ -20,6 +20,12 @@ const createTask = async (req, res) => {
             return res.status(400).json({ message: 'task_date is required for non-recurring task' });
         }
 
+        // Check for duplicate
+        const existingTask = await TaskModel.findDuplicate(plan_id, title, task_date, is_recurring);
+        if (existingTask) {
+            return res.status(200).json(existingTask);
+        }
+
         const task = await TaskModel.create({
             plan_id,
             title,
