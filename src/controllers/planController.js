@@ -16,17 +16,21 @@ const createPlan = async (req, res) => {
         display_order
     } = req.body;
     const user_id = req.user.id;
+    const sanitizedName = name ? name.trim() : name;
 
     try {
         // Check for duplicate
-        const existingPlan = await PlanModel.findDuplicate(user_id, name, start_date, end_date);
+        console.log(`Checking duplicate for: ${sanitizedName}, ${start_date}, ${end_date}`);
+        const existingPlan = await PlanModel.findDuplicate(user_id, sanitizedName, start_date, end_date);
+
         if (existingPlan) {
+            console.log('Duplicate plan found:', existingPlan.id);
             return res.status(200).json(existingPlan);
         }
 
         const plan = await PlanModel.create({
             user_id,
-            name,
+            name: sanitizedName,
             description,
             plan_type,
             start_date,

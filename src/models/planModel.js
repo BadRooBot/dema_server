@@ -27,7 +27,13 @@ class PlanModel {
     }
 
     static async findDuplicate(user_id, name, start_date, end_date) {
-        const text = 'SELECT * FROM plans WHERE user_id = $1 AND name = $2 AND start_date = $3 AND end_date = $4';
+        const text = `
+            SELECT * FROM plans 
+            WHERE user_id = $1 
+            AND TRIM(name) = TRIM($2) 
+            AND start_date::date = $3::date 
+            AND end_date::date = $4::date
+        `;
         const { rows } = await db.query(text, [user_id, name, start_date, end_date]);
         return rows[0];
     }
