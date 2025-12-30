@@ -8,15 +8,15 @@ class PlanModel {
       RETURNING *
     `;
         const values = [
-            user_id, 
-            name, 
-            description, 
-            plan_type || 'other', 
-            start_date, 
-            end_date, 
-            image_path, 
-            status || 'not_started', 
-            priority || 2, 
+            user_id,
+            name,
+            description,
+            plan_type || 'other',
+            start_date,
+            end_date,
+            image_path,
+            status || 'not_started',
+            priority || 2,
             color || '#4CAF50',
             daily_goal_minutes || 0,
             reminders_enabled !== undefined ? reminders_enabled : 1,
@@ -26,15 +26,45 @@ class PlanModel {
         return rows[0];
     }
 
-    static async findDuplicate(user_id, name, start_date, end_date) {
+    // Atomic findOrCreate using CTE - prevents race conditions
+    static async findOrCreate({ user_id, name, description, plan_type, start_date, end_date, image_path, priority, color, status, daily_goal_minutes, reminders_enabled, display_order }) {
+        const sanitizedName = name ? name.trim() : name;
         const text = `
-            SELECT * FROM plans 
-            WHERE user_id = $1 
-            AND TRIM(name) = TRIM($2) 
-            AND start_date::date = $3::date 
-            AND end_date::date = $4::date
+            WITH existing AS (
+                SELECT * FROM plans 
+                WHERE user_id = $1 
+                AND TRIM(name) = $2 
+                AND start_date::date = $3::date 
+                AND end_date::date = $4::date
+                LIMIT 1
+            ),
+            inserted AS (
+                INSERT INTO plans (user_id, name, description, plan_type, start_date, end_date, image_path, status, priority, color, daily_goal_minutes, reminders_enabled, display_order)
+                SELECT $1, $2, $5, $6, $3, $4, $7, $8, $9, $10, $11, $12, $13
+                WHERE NOT EXISTS (SELECT 1 FROM existing)
+                RETURNING *
+            )
+            SELECT *, 'existing' as _source FROM existing
+            UNION ALL
+            SELECT *, 'inserted' as _source FROM inserted
+            LIMIT 1
         `;
-        const { rows } = await db.query(text, [user_id, name, start_date, end_date]);
+        const values = [
+            user_id,
+            sanitizedName,
+            start_date,
+            end_date,
+            description,
+            plan_type || 'other',
+            image_path,
+            status || 'not_started',
+            priority || 2,
+            color || '#4CAF50',
+            daily_goal_minutes || 0,
+            reminders_enabled !== undefined ? reminders_enabled : 1,
+            display_order || 0
+        ];
+        const { rows } = await db.query(text, values);
         return rows[0];
     }
 

@@ -16,21 +16,12 @@ const createPlan = async (req, res) => {
         display_order
     } = req.body;
     const user_id = req.user.id;
-    const sanitizedName = name ? name.trim() : name;
 
     try {
-        // Check for duplicate
-        console.log(`Checking duplicate for: ${sanitizedName}, ${start_date}, ${end_date}`);
-        const existingPlan = await PlanModel.findDuplicate(user_id, sanitizedName, start_date, end_date);
-
-        if (existingPlan) {
-            console.log('Duplicate plan found:', existingPlan.id);
-            return res.status(200).json(existingPlan);
-        }
-
-        const plan = await PlanModel.create({
+        // Atomic findOrCreate - prevents race conditions
+        const plan = await PlanModel.findOrCreate({
             user_id,
-            name: sanitizedName,
+            name,
             description,
             plan_type,
             start_date,
@@ -43,7 +34,11 @@ const createPlan = async (req, res) => {
             reminders_enabled,
             display_order
         });
-        res.status(201).json(plan);
+
+        // Return 200 if existing, 201 if new
+        const statusCode = plan._source === 'existing' ? 200 : 201;
+        delete plan._source;
+        res.status(statusCode).json(plan);
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Server error' });

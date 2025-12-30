@@ -2,8 +2,13 @@ const HabitModel = require('../models/habitModel');
 
 const createHabit = async (req, res) => {
     try {
-        const habit = await HabitModel.create({ ...req.body, user_id: req.user.id });
-        res.status(201).json(habit);
+        // Atomic findOrCreate - prevents race conditions
+        const habit = await HabitModel.findOrCreate({ ...req.body, user_id: req.user.id });
+
+        // Return 200 if existing, 201 if new
+        const statusCode = habit._source === 'existing' ? 200 : 201;
+        delete habit._source;
+        res.status(statusCode).json(habit);
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Server error' });

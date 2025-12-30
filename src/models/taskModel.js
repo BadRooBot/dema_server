@@ -19,18 +19,56 @@ const TaskModel = {
         return rows[0];
     },
 
-    findDuplicate: async (plan_id, title, task_date, is_recurring) => {
-        let query = 'SELECT * FROM tasks WHERE plan_id = $1 AND title = $2';
-        let params = [plan_id, title];
+    // Atomic findOrCreate using CTE - prevents race conditions
+    findOrCreate: async (taskData) => {
+        const {
+            plan_id, title, description, duration_minutes, task_date, start_time,
+            is_recurring, recurrence_pattern, repeat_days, priority
+        } = taskData;
 
-        if (is_recurring) {
-            query += ' AND is_recurring = 1';
-        } else {
-            query += ' AND is_recurring = 0 AND task_date = $3';
-            params.push(task_date);
-        }
+        const sanitizedTitle = title ? title.trim() : title;
+        const isRecurringInt = is_recurring ? 1 : 0;
 
-        const { rows } = await db.query(query, params);
+        // For recurring tasks: match by plan_id + title + is_recurring
+        // For non-recurring tasks: match by plan_id + title + task_date
+        const text = `
+            WITH existing AS (
+                SELECT * FROM tasks 
+                WHERE plan_id = $1 
+                AND TRIM(title) = $2
+                AND (
+                    ($7 = 1 AND is_recurring = 1)
+                    OR
+                    ($7 = 0 AND is_recurring = 0 AND task_date::date = $5::date)
+                )
+                LIMIT 1
+            ),
+            inserted AS (
+                INSERT INTO tasks (plan_id, title, description, duration_minutes, task_date, start_time, is_recurring, recurrence_pattern, repeat_days, priority)
+                SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
+                WHERE NOT EXISTS (SELECT 1 FROM existing)
+                RETURNING *
+            )
+            SELECT *, 'existing' as _source FROM existing
+            UNION ALL
+            SELECT *, 'inserted' as _source FROM inserted
+            LIMIT 1
+        `;
+
+        const values = [
+            plan_id,
+            sanitizedTitle,
+            description,
+            duration_minutes || 30,
+            is_recurring ? null : task_date,
+            start_time,
+            isRecurringInt,
+            is_recurring ? (recurrence_pattern || 'custom') : null,
+            is_recurring ? repeat_days : null,
+            priority || 2
+        ];
+
+        const { rows } = await db.query(text, values);
         return rows[0];
     },
 

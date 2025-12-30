@@ -12,6 +12,34 @@ class NoteModel {
         return rows[0];
     }
 
+    // Atomic findOrCreate using CTE - prevents race conditions
+    static async findOrCreate({ user_id, plan_id, task_id, title, content, color }) {
+        const sanitizedTitle = title ? title.trim() : title;
+        const text = `
+            WITH existing AS (
+                SELECT * FROM notes 
+                WHERE user_id = $1 
+                AND (plan_id = $2 OR ($2 IS NULL AND plan_id IS NULL))
+                AND TRIM(COALESCE(title, '')) = COALESCE($4, '')
+                AND content = $5
+                LIMIT 1
+            ),
+            inserted AS (
+                INSERT INTO notes (user_id, plan_id, task_id, title, content, color)
+                SELECT $1, $2, $3, $4, $5, $6
+                WHERE NOT EXISTS (SELECT 1 FROM existing)
+                RETURNING *
+            )
+            SELECT *, 'existing' as _source FROM existing
+            UNION ALL
+            SELECT *, 'inserted' as _source FROM inserted
+            LIMIT 1
+        `;
+        const values = [user_id, plan_id || null, task_id || null, sanitizedTitle, content, color || '#FFEB3B'];
+        const { rows } = await db.query(text, values);
+        return rows[0];
+    }
+
     static async findAllByUserId(user_id) {
         const text = 'SELECT * FROM notes WHERE user_id = $1 ORDER BY is_pinned DESC, created_at DESC';
         const { rows } = await db.query(text, [user_id]);

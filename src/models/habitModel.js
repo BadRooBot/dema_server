@@ -11,6 +11,32 @@ const HabitModel = {
         return rows[0];
     },
 
+    // Atomic findOrCreate using CTE - prevents race conditions
+    findOrCreate: async ({ user_id, name, description, icon, color, target_days, reminder_time }) => {
+        const sanitizedName = name ? name.trim() : name;
+        const text = `
+            WITH existing AS (
+                SELECT * FROM habits 
+                WHERE user_id = $1 
+                AND TRIM(name) = $2
+                LIMIT 1
+            ),
+            inserted AS (
+                INSERT INTO habits (user_id, name, description, icon, color, target_days, reminder_time)
+                SELECT $1, $2, $3, $4, $5, $6, $7
+                WHERE NOT EXISTS (SELECT 1 FROM existing)
+                RETURNING *
+            )
+            SELECT *, 'existing' as _source FROM existing
+            UNION ALL
+            SELECT *, 'inserted' as _source FROM inserted
+            LIMIT 1
+        `;
+        const values = [user_id, sanitizedName, description, icon || '✓', color || '#4CAF50', target_days || '1111111', reminder_time];
+        const { rows } = await db.query(text, values);
+        return rows[0];
+    },
+
     findAllByUserId: async (user_id) => {
         const { rows } = await db.query(
             'SELECT * FROM habits WHERE user_id = $1 AND is_active = 1 ORDER BY created_at DESC',

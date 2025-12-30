@@ -20,26 +20,24 @@ const createTask = async (req, res) => {
             return res.status(400).json({ message: 'task_date is required for non-recurring task' });
         }
 
-        // Check for duplicate
-        const existingTask = await TaskModel.findDuplicate(plan_id, title, task_date, is_recurring);
-        if (existingTask) {
-            return res.status(200).json(existingTask);
-        }
-
-        const task = await TaskModel.create({
+        // Atomic findOrCreate - prevents race conditions
+        const task = await TaskModel.findOrCreate({
             plan_id,
             title,
             description,
-            duration_minutes: duration_minutes || 30,
-            task_date: is_recurring ? null : task_date,
+            duration_minutes,
+            task_date,
             start_time,
-            is_recurring: is_recurring || false,
-            recurrence_pattern: is_recurring ? (recurrence_pattern || 'custom') : null,
-            repeat_days: is_recurring ? repeat_days : null,
-            priority: priority || 2
+            is_recurring,
+            recurrence_pattern,
+            repeat_days,
+            priority
         });
 
-        res.status(201).json(task);
+        // Return 200 if existing, 201 if new
+        const statusCode = task._source === 'existing' ? 200 : 201;
+        delete task._source;
+        res.status(statusCode).json(task);
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Server error', error: error.message });

@@ -21,8 +21,13 @@ const createNote = async (req, res) => {
             if (plan.user_id !== req.user.id) return res.status(403).json({ message: 'Not authorized' });
         }
 
-        const note = await NoteModel.create({ ...req.body, user_id: req.user.id });
-        res.status(201).json(note);
+        // Atomic findOrCreate - prevents race conditions
+        const note = await NoteModel.findOrCreate({ ...req.body, user_id: req.user.id });
+
+        // Return 200 if existing, 201 if new
+        const statusCode = note._source === 'existing' ? 200 : 201;
+        delete note._source;
+        res.status(statusCode).json(note);
     } catch (error) {
         console.error(error);
         res.status(500).json({ message: 'Server error' });
