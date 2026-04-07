@@ -117,13 +117,15 @@ const deleteTask = async (req, res) => {
         if (!task) return res.status(404).json({ message: 'Task not found' });
 
         const plan = await PlanModel.findById(task.plan_id);
-        if (plan.user_id !== req.user.id) return res.status(403).json({ message: 'Not authorized' });
+        // Allow deletion if plan was already deleted (orphaned task)
+        // or if the user owns the plan
+        if (plan && plan.user_id !== req.user.id) return res.status(403).json({ message: 'Not authorized' });
 
         await TaskModel.delete(req.params.id);
         res.json({ message: 'Task deleted' });
     } catch (error) {
         console.error(error);
-        res.status(500).json({ message: 'Server error' });
+        res.status(500).json({ message: 'Server error', error: error.message });
     }
 };
 
